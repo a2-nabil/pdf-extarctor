@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Image and Text Extractor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        input[type="file"], button {
+            margin-bottom: 20px;
+        }
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .image-box {
+            margin: 10px;
+        }
+        .text-box {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload PDF to Extract Text and Images</h1>
+    <form id="pdfForm" action="/extract" method="POST" enctype="multipart/form-data">
+        <input type="file" name="pdf" accept=".pdf" required>
+        <button type="submit">Extract</button>
+    </form>
+
+    <form id="extractedDataForm">
+        <input type="file" name="img-1" id="img-1">
+        <input type="file" name="img-2" id="img-2">
+        <input type="text" name="text-1" id="text-1">
+        <input type="text" name="text-2" id="text-2">
+        <input type="text" name="text-3" id="text-3">
+        <input type="text" name="text-4" id="text-4">
+        <input type="text" name="text-5" id="text-5">
+        <input type="text" name="text-6" id="text-6">
+        <input type="submit">
+    </form>
+
+
+   
+</body>
+</html>

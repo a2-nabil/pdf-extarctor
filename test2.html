@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        font-family: Georgia, sans-serif;
+      }
+      body h1 {
+        text-align: center;
+      }
+      body details {
+        background: gold;
+      }
+      body details summary {
+        cursor: pointer;
+      }
+      body ul {
+        list-style: none;
+      }
+      body img,
+      body details > svg {
+        max-width: 100%;
+        height: auto;
+      }
+
+      #pdfs {
+        display: inline-block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 2em;
+        font-size: 2em;
+        text-align: center;
+        color: white;
+        background: dodgerblue;
+        border: 0.25em dashed lightskyblue;
+        cursor: pointer;
+      }
+      #pdfs input {
+        display: none;
+      }
+
+      svg image {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      console.clear();
+    </script>
+    <script src="https://unpkg.com/pdfjs-dist@2/build/pdf.js"></script>
+    <script src="https://unpkg.com/pdfjs-dist@2/build/pdf.worker.js"></script>
+    <script src="https://unpkg.com/vue@2"></script>
+    <script src="https://unpkg.com/abo-utils@0.3"></script>
+
+    <script type="text/x-template" id="templ-page">
+      <div>
+          <details v-if="p.svg.doc" @click="handleSVG" ref="svgContainer">
+              <summary>Page {{p.number}} (click for SVG rendered version)</summary>
+          </details>
+          <h4 v-else>Page {{p.number}}</h4>
+          <ul>
+              <li v-for="image in p.images">
+                  <figure>
+                      <a :href="image.url" :download="image.name"><img :src="image.url" :alt="image.name"></a>
+                      <figcaption>{{image.name}}</figcaption>
+                  </figure>
+              </li>
+          </ul>
+      </div>
+    </script>
+
+    <header>
+      <h1>Extract PDF images</h1>
+    </header>
+
+    <main id="app">
+      <label id="pdfs">
+        <input type="file" multiple :accept="mime" />
+        <span>Open PDFs</span>
+      </label>
+
+      <h2 v-if="docs.length">(Click the images to download)</h2>
+
+      <section v-for="doc in docs">
+        <h3>{{doc.name}}</h3>
+        <ul>
+          <li v-for="page in doc.pages">
+            <page :p="page" />
+          </li>
+        </ul>
+      </section>
+      <pre>
+    {{ /* docs */ }}
+    </pre
+      >
+    </main>
+    <script>
+      (function () {
+        const PDFJS = pdfjsLib,
+          pdfMime = "application/pdf",
+          ad = ABOUtils.DOM,
+          [$, $$] = ad.selectors();
+
+        const state = {
+          mime: pdfMime,
+          docs: [],
+        };
+
+        //https://stackoverflow.com/a/39855420/1869660
+        //https://www.sitepoint.com/custom-pdf-rendering/#renderingusingsvg
+        function parsePage(page, pageInfo) {
+          page.getOperatorList().then(function (ops) {
+            console.log("ops", ops);
+            const fns = ops.fnArray,
+              args = ops.argsArray;
+
+            let imgsFound = 0;
+            args.forEach((arg, i) => {
+              //Not a JPEG resource:
+              if (fns[i] !== PDFJS.OPS.paintJpegXObject) {
+                return;
+              }
+
+              console.log("loading", arg);
+              imgsFound++;
+
+              const imgKey = arg[0],
+                imgInfo = {
+                  name: pageInfo.name + "-" + imgsFound + ".jpg",
+                  url: "",
+                };
+              pageInfo.images.push(imgInfo);
+
+              page.objs.get(imgKey, (img) => {
+                imgInfo.url = img.src;
+              });
+            });
+          });
+
+          //Full SVG:
+
+          // Get viewport (dimensions)
+          const scale = 1.5;
+          const viewport = page.getViewport({ scale });
+
+          pageInfo.svg = {
+            w: viewport.width,
+            h: viewport.height,
+            doc: "",
+          };
+
+          // SVG rendering by PDF.js
+          page
+            .getOperatorList()
+            .then((opList) => {
+              var svgGfx = new PDFJS.SVGGraphics(page.commonObjs, page.objs);
+              return svgGfx.getSVG(opList, viewport);
+            })
+            .then((svg) => {
+              //console.log(svg);
+              pageInfo.svg.doc = svg;
+            });
+        }
+
+        function handleFiles(data) {
+          //console.log('files', data);
+          const docs = [];
+
+          data.forEach((d) => {
+            const docName = d.file.name,
+              pages = [];
+            docs.push({
+              name: docName,
+              pages,
+            });
+
+            PDFJS.getDocument({
+              url: d.url,
+              //password: "test",
+            })
+              .promise.then(function (doc) {
+                for (let p = 1; p <= doc.numPages; p++) {
+                  const pageInfo = {
+                    number: p,
+                    name: docName + "-" + p,
+                    images: [],
+                    svg: {},
+                  };
+                  pages.push(pageInfo);
+
+                  doc.getPage(p).then((page) => parsePage(page, pageInfo));
+                }
+              })
+              .catch(function (error) {
+                alert("Failed to open " + docName);
+                console.log(error);
+              });
+          });
+
+          state.docs = docs;
+          console.log(state);
+        }
+
+        Vue.component("page", {
+          template: "#templ-page",
+          props: ["p"],
+          data() {
+            return {
+              checked: false,
+              title: "Check me",
+            };
+          },
+          methods: {
+            handleSVG(e) {
+              const imgUrl = e.target.href?.baseVal;
+              if (imgUrl) {
+                console.log(imgUrl);
+                window.open(imgUrl, "_blank");
+              } else {
+                this.$refs.svgContainer.appendChild(this.p.svg.doc);
+              }
+            },
+          },
+        });
+        new Vue({
+          el: "#app",
+          data: state,
+        });
+
+        ad.dropFiles($("#pdfs input"), handleFiles, {
+          acceptedTypes: [pdfMime],
+        });
+        ad.dropFiles(document, handleFiles, { acceptedTypes: [pdfMime] });
+      })();
+    </script>
+  </body>
+</html>
